@@ -1,4 +1,5 @@
 const Joi = require("joi");
+const {createHmac}= require("crypto");
 exports.signUpValidator = Joi.object({
   email: Joi.string()
     .min(6)
@@ -19,3 +20,7 @@ exports.signInValidator = Joi.object({
     }),
   password: Joi.string().pattern(new RegExp("^(?=.*[A-Z]).*$")),
 });
+exports.hmacValidator = (value, key) => {
+  const result=createHmac('sha256',key).update(value).digest('hex');
+  return result;
+}
