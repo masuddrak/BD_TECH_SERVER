@@ -1,16 +1,21 @@
-const Joi = require('joi');
+const Joi = require("joi");
 exports.signUpValidator = Joi.object({
-    email: Joi.string()
-        .min(6)
-        .max(30)
-        .required()
-        .email(
-            {
-                tlds: { allow: ['com', 'net'] }
-            }
-        ),
-
-    password: Joi.string().pattern(new RegExp('^(?=.*[A-Z]).*$')),
-        
+  email: Joi.string()
+    .min(6)
+    .max(30)
+    .required()
+    .email({
+      tlds: { allow: ["com", "net"] },
+    }),
+  password: Joi.string().pattern(new RegExp("^(?=.*[A-Z]).*$")),
 });
-
+exports.signInValidator = Joi.object({
+  email: Joi.string()
+    .min(6)
+    .max(30)
+    .required()
+    .email({
+      tlds: { allow: ["com", "net"] },
+    }),
+  password: Joi.string().pattern(new RegExp("^(?=.*[A-Z]).*$")),
+});
