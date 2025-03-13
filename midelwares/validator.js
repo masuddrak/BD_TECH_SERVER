@@ -20,7 +20,19 @@ exports.signInValidator = Joi.object({
     }),
   password: Joi.string().pattern(new RegExp("^(?=.*[A-Z]).*$")),
 });
+// node hmacValidator
 exports.hmacValidator = (value, key) => {
   const result=createHmac('sha256',key).update(value).digest('hex');
   return result;
 }
+// code validate schema
+exports.acceptedCodeValidator=Joi.object({
+  email: Joi.string()
+    .min(6)
+    .max(30)
+    .required()
+    .email({
+      tlds: { allow: ["com", "net"] },
+    }),
+  providedCode: Joi.number().required(),
+});

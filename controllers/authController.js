@@ -1,5 +1,5 @@
 const transport = require("../midelwares/sendMail");
-const { signUpValidator, signInValidator, hmacValidator } = require("../midelwares/validator");
+const { signUpValidator, signInValidator, hmacValidator, acceptedCodeValidator } = require("../midelwares/validator");
 const User = require("../models/usersModel");
 const { dohash, compareHashPassword } = require("../utills/hassing");
 const jwt = require("jsonwebtoken");
@@ -127,5 +127,42 @@ exports.sendVerificationCode = async (req, res) => {
     console.log("verification code error", error);
     res.status(500).json({ success: false, message: "server error" });
     
+  }
+}
+exports.verifyVerificationCode = async (req, res) => {
+  const { email, providedCode } = req.body
+  try {
+    
+    const { error, value } = acceptedCodeValidator.validate({ email, providedCode })
+    if (error) {
+     return res.status(201).json({success:false,message:error.details[0].message})
+    }
+    const codeValue=providedCode.toString()
+    const existUser = await User.findOne({ email }).select("+verificationCode +verificationCodeVerified")
+    if (!existUser) {
+     return res.status(404).json({success:false,message:"user not found"})
+    }
+    if (existUser.verified) {
+      return res.status(400).json({success:false,message:"You are already verified"})
+    }
+    if (!existUser.verificationCode || !existUser.verificationCodeVerified) {
+      return res.status(400).json({success:false,message:"somethig is wrong!!"})
+    }
+    if (new Date() - existUser.verificationCodeVerified > 5 * 60 * 1000) {
+      return res.status(404).json({success:false,message:"your code i expaird!!"})
+    }
+    const compaireCodeValue = hmacValidator(codeValue, process.env.hmacKey)
+    console.log(compaireCodeValue,existUser.verificationCode)
+    if (compaireCodeValue === existUser.verificationCode) {
+      existUser.verified = true
+      existUser.verificationCodeVerified=undefined
+      existUser.verificationCode = undefined
+      await existUser.save()
+      return res.status(200).json({success:true,message:"verified you successfully"})
+    }
+    return res.status(400).json({success:false,message:"unexpected author"})
+
+  } catch (error) {
+    console.log(error)
   }
 }
