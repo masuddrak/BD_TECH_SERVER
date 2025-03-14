@@ -36,3 +36,9 @@ exports.acceptedCodeValidator=Joi.object({
     }),
   providedCode: Joi.number().required(),
 });
+
+exports.changePasswordValidator = Joi.object({
+  newPassword: Joi.string().pattern(new RegExp("^(?=.*[A-Z]).*$")),
+  oldPassword: Joi.string().pattern(new RegExp("^(?=.*[A-Z]).*$")),
+
+})
