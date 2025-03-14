@@ -1,5 +1,11 @@
 const transport = require("../midelwares/sendMail");
-const { signUpValidator, signInValidator, hmacValidator, acceptedCodeValidator } = require("../midelwares/validator");
+const {
+  signUpValidator,
+  signInValidator,
+  hmacValidator,
+  acceptedCodeValidator,
+  changePasswordValidator,
+} = require("../midelwares/validator");
 const User = require("../models/usersModel");
 const { dohash, compareHashPassword } = require("../utills/hassing");
 const jwt = require("jsonwebtoken");
@@ -118,51 +124,114 @@ exports.sendVerificationCode = async (req, res) => {
       const hmacCode = hmacValidator(code, process.env.hmacKey);
       existUser.verificationCode = hmacCode;
       existUser.verificationCodeVerified = new Date();
-      
+
       await existUser.save();
-      return res.status(200).json({success:true,message:"verification code sent"});
+      return res
+        .status(200)
+        .json({ success: true, message: "verification code sent" });
     }
-    res.status(400).json({success:false,message:"email not sent"});
+    res.status(400).json({ success: false, message: "email not sent" });
   } catch (error) {
     console.log("verification code error", error);
     res.status(500).json({ success: false, message: "server error" });
-    
   }
-}
+};
 exports.verifyVerificationCode = async (req, res) => {
-  const { email, providedCode } = req.body
+  const { email, providedCode } = req.body;
   try {
-    
-    const { error, value } = acceptedCodeValidator.validate({ email, providedCode })
+    const { error, value } = acceptedCodeValidator.validate({
+      email,
+      providedCode,
+    });
     if (error) {
-     return res.status(201).json({success:false,message:error.details[0].message})
+      return res
+        .status(201)
+        .json({ success: false, message: error.details[0].message });
     }
-    const codeValue=providedCode.toString()
-    const existUser = await User.findOne({ email }).select("+verificationCode +verificationCodeVerified")
+    const codeValue = providedCode.toString();
+    const existUser = await User.findOne({ email }).select(
+      "+verificationCode +verificationCodeVerified"
+    );
     if (!existUser) {
-     return res.status(404).json({success:false,message:"user not found"})
+      return res
+        .status(404)
+        .json({ success: false, message: "user not found" });
     }
     if (existUser.verified) {
-      return res.status(400).json({success:false,message:"You are already verified"})
+      return res
+        .status(400)
+        .json({ success: false, message: "You are already verified" });
     }
     if (!existUser.verificationCode || !existUser.verificationCodeVerified) {
-      return res.status(400).json({success:false,message:"somethig is wrong!!"})
+      return res
+        .status(400)
+        .json({ success: false, message: "somethig is wrong!!" });
     }
     if (new Date() - existUser.verificationCodeVerified > 5 * 60 * 1000) {
-      return res.status(404).json({success:false,message:"your code i expaird!!"})
+      return res
+        .status(404)
+        .json({ success: false, message: "your code i expaird!!" });
     }
-    const compaireCodeValue = hmacValidator(codeValue, process.env.hmacKey)
-    console.log(compaireCodeValue,existUser.verificationCode)
+    const compaireCodeValue = hmacValidator(codeValue, process.env.hmacKey);
     if (compaireCodeValue === existUser.verificationCode) {
-      existUser.verified = true
-      existUser.verificationCodeVerified=undefined
-      existUser.verificationCode = undefined
-      await existUser.save()
-      return res.status(200).json({success:true,message:"verified you successfully"})
+      existUser.verified = true;
+      existUser.verificationCodeVerified = undefined;
+      existUser.verificationCode = undefined;
+      await existUser.save();
+      return res
+        .status(200)
+        .json({ success: true, message: "verified you successfully" });
     }
-    return res.status(400).json({success:false,message:"unexpected author"})
-
+    return res
+      .status(400)
+      .json({ success: false, message: "unexpected author" });
   } catch (error) {
-    console.log(error)
+    console.log(error);
   }
-}
+};
+
+exports.changePassword = async (req, res) => {
+  const { id, verified } = req.user;
+  const { oldPassword, newPassword } = req.body;
+  try {
+    const { error, value } = changePasswordValidator.validate({
+      newPassword,
+      oldPassword,
+    });
+    if (error) {
+      return res
+        .status(401)
+        .json({ success: false, message: error.details[0].message });
+    }
+    if (!verified) {
+      return res
+        .status(401)
+        .json({ success: false, message: "user can not verified" });
+    }
+    const existUser = await User.findOne({ _id: id }).select("+password");
+    if (!existUser) {
+      return res
+        .status(401)
+        .json({ success: false, message: "user dont`t find Database" });
+    }
+
+    const compairePassword = await compareHashPassword(
+      oldPassword,
+      existUser.password
+    );
+
+    if (!compairePassword) {
+      return res
+        .status(201)
+        .json({ success: false, message: "old password not correct" });
+    }
+    const createNewPassword =await dohash(newPassword, 10);
+    existUser.password = createNewPassword;
+    await existUser.save();
+    return res
+      .status(200)
+      .json({ success: true, message: "Upadte your password" });
+  } catch (error) {
+    console.log(error);
+  }
+};
