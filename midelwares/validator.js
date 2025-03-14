@@ -42,3 +42,16 @@ exports.changePasswordValidator = Joi.object({
   oldPassword: Joi.string().pattern(new RegExp("^(?=.*[A-Z]).*$")),
 
 })
+//forgot password schema
+
+exports.acceptedCodeValidator=Joi.object({
+  email: Joi.string()
+    .min(6)
+    .max(30)
+    .required()
+    .email({
+      tlds: { allow: ["com", "net"] },
+    }),
+  providedCode: Joi.number().required(),
+  newPassword: Joi.string().pattern(new RegExp("^(?=.*[A-Z]).*$")),
+});

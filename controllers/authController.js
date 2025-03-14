@@ -235,3 +235,88 @@ exports.changePassword = async (req, res) => {
     console.log(error);
   }
 };
+// create fogot password function
+exports.sendForgotVerificationCode = async (req, res) => {
+  const { email } = req.body;
+  try {
+    const existUser = await User.findOne({ email });
+    if (!existUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "user not found" });
+    }
+    const code = Math.floor(Math.random() * 900000).toString();
+    let info = await transport.sendMail({
+      from: process.env.NODE_SENDING_EMAIL_ADDRESS,
+      to: existUser.email,
+      subject: "Forgot verification code",
+      html: `<h1>your verification code is ${code}</h1>`,
+    });
+    if (info.accepted[0] === existUser.email) {
+      const hmacCode = hmacValidator(code, process.env.hmacKey);
+      existUser.forgotPasswordCode = hmacCode;
+      existUser.forgotPasswordCodeVerification = new Date();
+
+      await existUser.save();
+      return res
+        .status(200)
+        .json({ success: true, message: "verification code sent" });
+    }
+    res.status(400).json({ success: false, message: "email not sent" });
+  } catch (error) {
+    console.log("verification code error", error);
+    res.status(500).json({ success: false, message: "server error" });
+  }
+};
+exports.verifyForgotVerificationCode = async (req, res) => {
+  const { email, providedCode,newPassword } = req.body;
+  try {
+    const { error, value } = acceptedCodeValidator.validate({
+      email,
+      providedCode,
+      newPassword
+    });
+    if (error) {
+      return res
+        .status(201)
+        .json({ success: false, message: error.details[0].message });
+    }
+    const codeValue = providedCode.toString();
+    const existUser = await User.findOne({ email }).select(
+      "+forgotPasswordCode +forgotPasswordCodeVerification"
+    );
+    if (!existUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "user not found" });
+    }
+
+    if (!existUser.forgotPasswordCode || !existUser.forgotPasswordCodeVerification) {
+      return res
+        .status(400)
+        .json({ success: false, message: "somethig is wrong!!" });
+    }
+    if (new Date() - existUser.verificationCodeVerified > 5 * 60 * 1000) {
+      return res
+        .status(404)
+        .json({ success: false, message: "your code i expaird!!" });
+    }
+    const compaireCodeValue = hmacValidator(codeValue, process.env.hmacKey);
+    if (compaireCodeValue === existUser.forgotPasswordCode) {
+      const createNewPassword =await dohash(newPassword, 10);
+
+      existUser.password=createNewPassword
+      existUser.forgotPasswordCode = undefined;
+      existUser.forgotPasswordCodeVerification = undefined;
+      await existUser.save();
+      return res
+        .status(200)
+        .json({ success: true, message: "Update password  successfully" });
+    }
+    return res
+      .status(400)
+      .json({ success: false, message: "unexpected author" });
+  } catch (error) {
+    console.log(error);
+  }
+};
